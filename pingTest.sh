@@ -38,7 +38,7 @@ function fnIsNumericValue {
    # a regex is used to veify that the value passed on is numeric
    typeset    FUNC_NumRegEx="^[+-]?[0-9]+([.][0-9]+)?$"
 
-    if ! [[ $FUNC_Value =~ $FUNC_NumRegEx ]]
+    if [[ ! $FUNC_Value =~ $FUNC_NumRegEx ]]
      then
         echo "error: [$FUNC_Value] is NOT a number"
         exitCode=8
@@ -47,17 +47,17 @@ function fnIsNumericValue {
 }
 
 function fnLogStart {
-    echo "start time: $execTime" >> $logDir/$fileName"_"$logDate".log"
-    echo "" >> $logDir/$fileName"_"$logDate".log"
+    echo "start time: $execTime" >> $logFile
+    echo "" >> $logFile
 
-    echo "the hosts tested" >> $logDir/$fileName"_"$logDate".log"
-    echo "================" >> $logDir/$fileName"_"$logDate".log"
+    echo "the hosts tested" >> $logFile
+    echo "================" >> $logFile
 
-    cat $hostsFile >> $logDir/$fileName"_"$logDate".log"
-    echo "" >> $logDir/$fileName"_"$logDate".log"
+    cat $hostsFile >> $logFile
+    echo "" >> $logFile
 
-    echo "================" >> $logDir/$fileName"_"$logDate".log"
-    echo "" >> $logDir/$fileName"_"$logDate".log"
+    echo "================" >> $logFile
+    echo "" >> $logFile
 }
 
 function fnPing {
@@ -66,35 +66,35 @@ function fnPing {
 
     while IFS='' read -r host || [[ -n $host ]]; do
         echo "testing $host"
-        ping -c $pingCount $host >> $logDir/$fileName"_"$logDate"_pingresult.log"
+        ping -c $pingCount $host >> $workFile
         if [[ ! $? -eq 0 ]]; then
             exitCode=4
         fi
 
         logtime=$(date +%H:%M:%S)
 
-        part1=$(cat $logDir/$fileName"_"$logDate"_pingresult.log" | grep packets | sed 's/[A-Za-z% ]*//g' | sed 's/\,/;/g')
-        part2=$(cat $logDir/$fileName"_"$logDate"_pingresult.log" | grep rtt | sed 's/[A-Za-z= ]//g' | sed 's/[/]/;/g' | cut -c 4-)
+        part1=$(cat $workFile | grep packets | sed 's/[A-Za-z% ]*//g' | sed 's/\,/;/g')
+        part2=$(cat $workFile | grep rtt | sed 's/[A-Za-z= ]//g' | sed 's/[/]/;/g' | cut -c 4-)
                 
-        echo -n "$csvDate" >> $logDir/$fileName"_"$logDate".csv"
-        echo -n ";$logtime" >> $logDir/$fileName"_"$logDate".csv"
-        echo -n ";$hostname" >> $logDir/$fileName"_"$logDate".csv"
-        echo -n ";$host" >> $logDir/$fileName"_"$logDate".csv"
-        echo -n ";$part1" >> $logDir/$fileName"_"$logDate".csv"
-        echo ";$part2" >> $logDir/$fileName"_"$logDate".csv"
+        echo -n "$csvDate" >> $csvFile
+        echo -n ";$logtime" >> $csvFile
+        echo -n ";$hostname" >> $csvFile
+        echo -n ";$host" >> $csvFile
+        echo -n ";$part1" >> $csvFile
+        echo ";$part2" >> $csvFile
 
-        echo "" > $logDir/$fileName"_"$logDate"_pingresult.log"
+        echo "" > $workFile
 
     done < $hosts
 
-    rm $logDir/$fileName"_"$logDate"_pingresult.log"
+    rm $workFile
 }
 
 function fnEndScript {
     endDate=$(date +%H:%M:%S) 
-    echo "end time: $endDate" >> $logDir/$fileName"_"$logDate".log"
-    echo "exit code: $exitCode" >> $logDir/$fileName"_"$logDate".log"
-    echo "" >> $logDir/$fileName"_"$logDate".log"
+    echo "end time: $endDate" >> $logFile
+    echo "exit code: $exitCode" >> $logFile
+    echo "" >> $logFile
 }
 
 #-------------------------------------------------------------
@@ -156,6 +156,14 @@ fi
 if [[ -n $timeout ]]; then
     fnIsNumericValue $timeout
 fi
+
+#-------------------------------------------------------------
+# setting variable for File names for easier usage
+#-------------------------------------------------------------
+
+logFile="${logDir}/${fileName}_${logDate}.log"
+workFile="${logDir}/${fileName}_${logDate}_pingresult.log"
+csvFile="${logDir}/${fileName}_${logDate}.csv"
 
 #-------------------------------------------------------------
 # executing the main functions
