@@ -101,7 +101,7 @@ function fnEndScript {
 # gathering the parameters through getopts
 #-------------------------------------------------------------
 
-while getopts "c:l:n:h" OPTNAME
+while getopts "c:l:n:hx" OPTNAME
 do
 
     case $OPTNAME in
@@ -116,6 +116,8 @@ do
             exitCode=1
             exit $exitCode
             ;;
+
+        x) set -x ;;
 
         *)  echo "ungültiger Option-Parameter: [$myCmdLineArgs]" # if no valid parameter is entered, this will be executed
             exitCode=8
