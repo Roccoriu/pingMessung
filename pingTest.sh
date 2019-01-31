@@ -14,21 +14,40 @@ csvDate=$(date +%Y-%m-%d)
 hostname=$(cat /proc/sys/kernel/hostname)
 
 #-------------------------------------------------------------
+# Definition of the color codes for usage with echo -e
+#-------------------------------------------------------------
+
+default='\033[0m'
+red='\033[0;31m'
+green='\033[0;32m'
+orange='\033[0;33m'
+purple='\033[0;35m'
+cyan='\033[0;36m'
+
+lred='\033[1;31m'
+lgreen='\033[1;32m'
+yellow='\033[1;33m'
+lblue='\033[1;34m'
+lpurple='\033[1;35m'
+lcyan='\033[1;36m'
+white='\033[1;37m'
+
+#-------------------------------------------------------------
 # Definition of all functions
 #-------------------------------------------------------------
 
 function fnHelp {
-    echo "$fileName help: [-c]: enter a valid File name from which the hosts are gathered from"
-    echo "                        mandatory for execution"
-    echo ""
-    echo "                  [-l]: specify the logidrectory, in which all the files are created"
-    echo "                        mandatory for execution"
-    echo ""
-    echo "                  [-n]: specifiy the amount of packets which are to be sent to the destination"
-    echo "                        optional"
-    echo "                        default 3"
-    echo ""
-    echo "Script was written by Rocco Ciccone"
+    echo -e "${green}$fileName${default} help: ${green}[-c]:${default} enter a valid File name from which the hosts are gathered from"
+    echo -e "                     mandatory for execution"
+    echo -e ""
+    echo -e "               ${green}[-l]:${default} specify the logidrectory, in which all the files are created"
+    echo -e "                     mandatory for execution"
+    echo -e ""
+    echo -e "               ${green}[-n]:${default} specifiy the amount of packets which are to be sent to the destination"
+    echo -e "                     optional"
+    echo -e "                     default 3"
+    echo -e ""
+    echo -e "Script was written by Rocco Ciccone"
 }
 
 function fnIsNumericValue {
@@ -40,50 +59,86 @@ function fnIsNumericValue {
 
     if [[ ! $FUNC_Value =~ $FUNC_NumRegEx ]]
      then
-        echo "error: [$FUNC_Value] is NOT a number"
+        echo -e "${red}error: ${yellow}[$FUNC_Value] ${red}is NOT a number${default}"
         exitCode=8
         exit $exitCode
      fi
 }
 
 function fnLogStart {
-    echo "start time: $execTime" >> $logFile
-    echo "" >> $logFile
+    
+    if [[ ${logDir:0:2} == "./" ]]; then
 
-    echo "the hosts tested" >> $logFile
-    echo "================" >> $logFile
+        if [[ ${logDir:$((${#logDir}-1)):1} == "/" ]]; then
+            echo -e -n "${green}writing log to: "
+            echo -e "${yellow}$(pwd)$(echo -n $logDir | cut -c 2-)$(basename $logFile${default})"
+        else
+            echo -e -n "${green}writing log to: "
+            echo -e "${yellow}$(pwd)$(echo -n $logDir | cut -c 2-)/$(basename $logFile${default})" 
+        fi
+
+    else
+
+        if [[ ${logDir:$((${#logDir}-1)):1} == "/" ]]; then
+            echo -e -n "${green}writing log to: "
+            echo -e "${yellow}$logDir$(echo -n $logDir | cut -c 2-)$(basename $logFile${default})"
+        else 
+            echo -e -n "${green}writing log to: "
+            echo -e "${yellow}$logDir$(echo -n $logDir | cut -c 2-)/$(basename $logFile${default})"
+        fi
+
+    fi
+
+    echo -e "start time: $execTime" >> $logFile
+    echo -e "" >> $logFile
+
+    echo -e "the hosts tested" >> $logFile
+    echo -e "================" >> $logFile
 
     cat $hostsFile >> $logFile
-    echo "" >> $logFile
+    echo -e "" >> $logFile
 
-    echo "================" >> $logFile
-    echo "" >> $logFile
+    echo -e "================" >> $logFile
+    echo -e "" >> $logFile
 }
 
 function fnPing {
     hosts=$1
     pingCount=$2
-
+    echo "==============="
     while IFS='' read -r host || [[ -n $host ]]; do
-        echo "testing $host"
-        ping -c $pingCount $host >> $workFile
+        echo -e -n "testing $host: "
+        ping -c $pingCount $host >> $workFile &
+        
+        PID=$!
+
         if [[ ! $? -eq 0 ]]; then
             exitCode=4
         fi
+
+        i=1
+        sp="/-\|"
+        echo -n ' '
+        while [ -d /proc/$PID ]; do
+            printf "\b${sp:i++%${#sp}:1}"
+            sleep 0.1
+        done
 
         logtime=$(date +%H:%M:%S)
 
         part1=$(cat $workFile | grep packets | sed 's/[A-Za-z% ]*//g' | sed 's/\,/;/g')
         part2=$(cat $workFile | grep rtt | sed 's/[A-Za-z= ]//g' | sed 's/[/]/;/g' | cut -c 4-)
                 
-        echo -n "$csvDate" >> $csvFile
-        echo -n ";$logtime" >> $csvFile
-        echo -n ";$hostname" >> $csvFile
-        echo -n ";$host" >> $csvFile
-        echo -n ";$part1" >> $csvFile
-        echo ";$part2" >> $csvFile
+        echo -e -n "$csvDate" >> $csvFile
+        echo -e -n ";$logtime" >> $csvFile
+        echo -e -n ";$hostname" >> $csvFile
+        echo -e -n ";$host" >> $csvFile
+        echo -e -n ";$part1" >> $csvFile
+        echo -e ";$part2" >> $csvFile
 
-        echo "" > $workFile
+        echo -e "" > $workFile
+
+        echo -e " : ${green}done${default}"
 
     done < $hosts
 
@@ -92,9 +147,9 @@ function fnPing {
 
 function fnEndScript {
     endDate=$(date +%H:%M:%S) 
-    echo "end time: $endDate" >> $logFile
-    echo "exit code: $exitCode" >> $logFile
-    echo "" >> $logFile
+    echo -e "end time: $endDate" >> $logFile
+    echo -e "exit code: $exitCode" >> $logFile
+    echo -e "" >> $logFile
 }
 
 #-------------------------------------------------------------
@@ -119,7 +174,7 @@ do
 
         x) set -x ;;
 
-        *)  echo "ungültiger Option-Parameter: [$myCmdLineArgs]" # if no valid parameter is entered, this will be executed
+        *)  echo -e "${yellow}ungültiger Option-Parameter: ${red}[${@:OPTIND-1:1}]${default}" # if no valid parameter is entered, this will be executed
             exitCode=8
             exit $exitCode
             ;;
@@ -132,25 +187,25 @@ done
 #-------------------------------------------------------------
 
 if [[ -z $hostsFile ]]; then
-    echo "you have not specified a config file, please do so"
+    echo -e "${red}you have not specified a config file, please do so${default}"
     exitCode=8
     exit $exitCode
 fi
 
 if [[ ! -f $hostsFile ]]; then
-    echo "$hostsFile is no a valid file, please enter a valid file name and try again"
+    echo -e "${red}$hostsFile${yellow}is no a valid file, please enter a valid file name and try again${default}"
     exitCode=8
     exit $exitCode
 fi
 
 if [[ -z $logDir ]]; then 
-    echo "you have not specified a log directory, please do so"
+    echo -e "${red}you have not specified a log directory, please do so${default}"
     exitCode=8
     exit $exitCode
 fi
 
 if [[ ! -d $logDir ]]; then
-    echo "$logDir is no a valid directory, please enter a valid directory and try again"
+    echo -e "${red}$logDir${yellow} is no a valid directory, please enter a valid directory and try again${default}"
     exitCode=8
     exit $exitCode
 fi
