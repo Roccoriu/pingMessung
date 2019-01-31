@@ -116,7 +116,7 @@ function fnPing {
     fi
 
     while IFS='' read -r host || [[ -n $host ]]; do
-        echo -e -n "testing $host: "
+        echo -e -n "${yellow}testing $host:${default} "
         ping -c $pingCount $host >> $workFile &
         
         PID=$!
@@ -127,7 +127,7 @@ function fnPing {
         if [[ -d /proc/$PID ]]; then
             #printf "\b${sp:i++%${#sp}:1}"
             #sleep 0.1
-            echo -ne "\033[1;32m\033[7m\033[?25l"
+            echo -ne "\033[1;33m\033[7m\033[?25l"
 
             for i in $pass ; do
                 
