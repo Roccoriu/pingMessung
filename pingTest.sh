@@ -14,6 +14,7 @@ csvDate=$(date +%Y-%m-%d)
 hostname=$(cat /proc/sys/kernel/hostname)
 pass='number1 number2 number3 number4 number5 number6 number7 number8 number9 number10 number11 number12 number13 number14 number15 number16'
 chk='number16'
+tableHeaders="Execution_Date;Execution_Time;Host;target;packets_sent;packets_recieved;errors;percent_lost;Time;rtt_min;rtt_avg;rtt_max;rtt_mdev"
 
 #-------------------------------------------------------------
 # Definition of the color codes for usage with echo -e
@@ -95,7 +96,7 @@ function fnLogStart {
     echo -e "================" >> $logFile
 
     cat $hostsFile >> $logFile
-    echo -e "" >> $logFile
+    #echo -e "" >> $logFile
 
     echo -e "================" >> $logFile
     echo -e "" >> $logFile
@@ -105,6 +106,15 @@ function fnPing {
     hosts=$1
     pingCount=$2
     echo "==============="
+
+    if [[ ! -f $csvFile ]]; then
+        echo -e "$tableHeaders" >> $csvFile 
+    fi
+    
+    if ! grep -q $tableHeaders $csvFile; then
+        echo -e "$tableHeaders" >> $csvFile 
+    fi
+
     while IFS='' read -r host || [[ -n $host ]]; do
         echo -e -n "testing $host: "
         ping -c $pingCount $host >> $workFile &
@@ -151,16 +161,31 @@ function fnPing {
 
         part1=$(cat $workFile | grep packets | sed 's/[A-Za-z%+ ]*//g' | sed 's/\,/;/g')
         part2=$(cat $workFile | grep rtt | sed 's/[A-Za-z= ]//g' | sed 's/[/]/;/g' | cut -c 4-)
-                
+
         echo -e -n "$csvDate" >> $csvFile
         echo -e -n ";$logtime" >> $csvFile
         echo -e -n ";$hostname" >> $csvFile
         echo -e -n ";$host" >> $csvFile
-        echo -e -n ";$part1" >> $csvFile
-        echo -e ";$part2" >> $csvFile
+        
+        IFS=';' read -r -a mArr <<< $part1
 
+        if [[ ${#mArr[@]} -lt 5 ]]; then
+            #echo -e -n ";$part1" >> $csvFile
+
+            mPart1=";${mArr[0]};${mArr[1]};0;${mArr[2]};${mArr[3]}"
+            echo -e -n "$mPart1" >> $csvFile
+        fi
+
+        if [[ ${#mArr[@]} -ge 5 ]]; then
+            echo -e -n ";$part1" >> $csvFile
+        fi
+
+        if [[ -z $part2 ]]; then
+            echo -e ";-.---;-.---;-.---;-.---" >> $csvFile
+        else 
+            echo -e ";$part2" >> $csvFile
+        fi
         echo -e "" > $workFile
-
         #echo -e " : ${green}done${default}"
 
     done < $hosts
