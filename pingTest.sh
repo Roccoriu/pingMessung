@@ -1,9 +1,9 @@
 #!/bin/bash
 # Written by Rocco Ciccone
 
-#-------------------------------------------------------------
-# Definition of all variables
-#-------------------------------------------------------------
+#=============================================================
+# Definition of global variables
+#=============================================================
 
 timeout=3
 exitCode=0
@@ -16,9 +16,9 @@ pass='number1 number2 number3 number4 number5 number6 number7 number8 number9 nu
 chk='number16'
 tableHeaders="Execution_Date;Execution_Time;Host;target;packets_sent;packets_recieved;errors;percent_lost;Time;rtt_min;rtt_avg;rtt_max;rtt_mdev"
 
-#-------------------------------------------------------------
+#=============================================================
 # Definition of the color codes for usage with echo -e
-#-------------------------------------------------------------
+#=============================================================
 
 default='\033[0m'
 red='\033[0;31m'
@@ -35,8 +35,12 @@ lpurple='\033[1;35m'
 lcyan='\033[1;36m'
 white='\033[1;37m'
 
-#-------------------------------------------------------------
+#=============================================================
 # Definition of all functions
+#=============================================================
+
+#-------------------------------------------------------------
+# Function to print help
 #-------------------------------------------------------------
 
 function fnHelp {
@@ -53,12 +57,13 @@ function fnHelp {
     echo -e "Script was written by Rocco Ciccone"
 }
 
+#-------------------------------------------------------------
+#Function to check wether a parameter is numeric or not
+#-------------------------------------------------------------
+
 function fnIsNumericValue {
-
-   typeset    FUNC_Value=$1
-
-   # a regex is used to veify that the value passed on is numeric
-   typeset    FUNC_NumRegEx="^[+-]?[0-9]+([.][0-9]+)?$"
+   declare FUNC_Value=$1
+   declare FUNC_NumRegEx="^[+-]?[0-9]+([.][0-9]+)?$" #<-- regex to check if value is numeric
 
     if [[ ! $FUNC_Value =~ $FUNC_NumRegEx ]]
      then
@@ -68,23 +73,33 @@ function fnIsNumericValue {
      fi
 }
 
+#-------------------------------------------------------------
+# Function to create the Logfile, 
+#-------------------------------------------------------------
+
 function fnLogStart {
+    if [[ ! -d $finalDir ]]; then 
+        mkdir $finalDir
+    fi
+    
     clear
+    echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         executing $fileName in $(pwd)" >> $errLog
     echo -en "${green}writing log to: "
+
     if [[ ${logDir:0:2} == "./" ]]; then
 
         if [[ ${logDir:$((${#logDir}-1)):1} == "/" ]]; then
-            echo -e "${yellow}$(pwd)$(echo -n $logDir | cut -c 2-)$(basename $logFile${default})"
+            echo -e "${yellow}$(pwd)$(echo -n $logDir | cut -c 2-)${fileName}-${logDate}/$(basename $logFile${default})"
         else
-            echo -e "${yellow}$(pwd)$(echo -n $logDir | cut -c 2-)/$(basename $logFile${default})" 
+            echo -e "${yellow}$(pwd)$(echo -n $logDir | cut -c 2-)/${fileName}-${logDate}/$(basename $logFile${default})" 
         fi
 
     else
 
         if [[ ${logDir:$((${#logDir}-1)):1} == "/" ]]; then
-            echo -e "${yellow}$logDir$(echo -n $logDir | cut -c 2-)$(basename $logFile${default})"
+            echo -e "${yellow}$logDir$(echo -n $logDir | cut -c 2-)${fileName}-${logDate}/$(basename $logFile${default})"
         else 
-            echo -e "${yellow}$logDir$(echo -n $logDir | cut -c 2-)/$(basename $logFile${default})"
+            echo -e "${yellow}$logDir$(echo -n $logDir | cut -c 2-)/${fileName}-${logDate}/$(basename $logFile${default})"
         fi
 
     fi
@@ -96,18 +111,20 @@ function fnLogStart {
     echo -e "================" >> $logFile
 
     cat $hostsFile >> $logFile
-    #echo -e "" >> $logFile
 
     echo -e "================" >> $logFile
     echo -e "" >> $logFile
+
+    echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         created Log File" >> $errLog
 }
 
 function fnPing {
     hosts=$1
     pingCount=$2
     echo "==============="
-
+    
     if [[ ! -f $csvFile ]]; then
+        echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         csv file does not exis. Creating $csvFile" >> $errLog
         echo -e "$tableHeaders" >> $csvFile 
     fi
     
@@ -116,30 +133,25 @@ function fnPing {
     fi
 
     while IFS='' read -r host || [[ -n $host ]]; do
+        echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         testing $host" >> $errLog
         echo -e -n "${yellow}testing $host:${default} "
-        ping -c $pingCount $host >> $workFile &
+        ping -c $pingCount $host >> $workFile 2>> $errLog &
         
         PID=$!
 
-        #i=1
-        #sp="/-\|"
-        #echo -n ' '
         if [[ -d /proc/$PID ]]; then
-            #printf "\b${sp:i++%${#sp}:1}"
-            #sleep 0.1
             echo -ne "\033[1;33m\033[7m\033[?25l"
 
             for i in $pass ; do
-                
                     mTimeout=$( echo print $timeout/ 16. | python)
                     sleep ${mTimeout}s
-                
 
                 if [[ "$i" == "$chk" ]]; then
                     break
                 else
                     echo -n " "
                 fi
+
             done
 
             wait $PID
@@ -148,10 +160,12 @@ function fnPing {
 
             if [[ ! $mCode -eq 0 ]]; then
                 result="failed"
+                echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         $host did not Respond. IP/Hostname invalid or host is not turned on" >> $errLog
                 echo -e "${red}$result${default}: $host"
                 exitCode=4
             else 
                 result="done"
+                echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         scuess. $host responded" >> $errLog
                 echo -e "${green}$result${default}  : $host"
             fi
             
@@ -159,6 +173,7 @@ function fnPing {
 
         logtime=$(date +%H:%M:%S)
 
+        echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         writing $csvFile" >> $errLog
         part1=$(cat $workFile | grep packets | sed 's/[A-Za-z%+ ]*//g' | sed 's/\,/;/g')
         part2=$(cat $workFile | grep rtt | sed 's/[A-Za-z= ]//g' | sed 's/[/]/;/g' | cut -c 4-)
 
@@ -170,8 +185,6 @@ function fnPing {
         IFS=';' read -r -a mArr <<< $part1
 
         if [[ ${#mArr[@]} -lt 5 ]]; then
-            #echo -e -n ";$part1" >> $csvFile
-
             mPart1=";${mArr[0]};${mArr[1]};0;${mArr[2]};${mArr[3]}"
             echo -e -n "$mPart1" >> $csvFile
         fi
@@ -185,31 +198,47 @@ function fnPing {
         else 
             echo -e ";$part2" >> $csvFile
         fi
+
+        echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         resetting $workFile for next Host" >> $errLog
         echo -e "" > $workFile
-        #echo -e " : ${green}done${default}"
 
     done < $hosts
 
     rm $workFile
+    echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         ping complete; removed $workFile" >> $errLog
     echo -e ""
 }
 
 function fnEndScript {
+    echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         finishing up" >> $errLog
     endDate=$(date +%H:%M:%S) 
     echo -e "end time: $endDate" >> $logFile
     echo -e "exit code: $exitCode" >> $logFile
     echo -e "" >> $logFile
+    echo "$(date +%Y-%m-%d) $(date +%H:%M:%S)         done" >> $errLog
 }
 
-#-------------------------------------------------------------
+#function fnCleanup {
+    
+    
+#   if [[ ! -d $finalDir ]]; then
+#      mkdir ${finalDir}
+#        mv ${logDir}/${fileName}_${logDate}* $finalDir
+#    else
+#        cat $csvFile >> "$finalDir/${fileName}_${logDate}.csv"
+#        cat $logFile >> "$finalDir/${fileName}_${logDate}.log"
+#        cat $errLog >> "$finalDir/${fileName}_${logDate}.log"
+#    fi
+
+#}
+
+#=============================================================
 # gathering the parameters through getopts
-#-------------------------------------------------------------
+#=============================================================
 
 while getopts "c:l:n:hx" OPTNAME
 do
-
     case $OPTNAME in
-
         c)  hostsFile=$OPTARG;;         # defining the hostsFile Variable which stores the name of the config file (Accepts File name with relative and absolute path)
 
         l)  logDir=$OPTARG;;            # definition of the logdirectory, in which the log file will be written to (accepts absolute and relatibe path)
@@ -228,12 +257,11 @@ do
             exit $exitCode
             ;;
     esac
-
 done
 
-#-------------------------------------------------------------
+#=============================================================
 # checking the parameters
-#-------------------------------------------------------------
+#=============================================================
 
 if [[ -z $hostsFile ]]; then
     echo -e "${red}you have not specified a config file, please do so${default}"
@@ -263,18 +291,21 @@ if [[ -n $timeout ]]; then
     fnIsNumericValue $timeout
 fi
 
-#-------------------------------------------------------------
+#=============================================================
 # setting variable for File names for easier usage
-#-------------------------------------------------------------
+#=============================================================
 
-logFile="${logDir}/${fileName}_${logDate}.log"
-workFile="${logDir}/${fileName}_${logDate}_pingresult.log"
-csvFile="${logDir}/${fileName}_${logDate}.csv"
+finalDir="${logDir}/${fileName}-${logDate}"
+logFile="${finalDir}/${fileName}_${logDate}.log"
+workFile="${finalDir}/${fileName}_${logDate}_pingresult.log"
+csvFile="${finalDir}/${fileName}_${logDate}.csv"
+errLog="${finalDir}/${fileName}_${logDate}_error.log"
 
-#-------------------------------------------------------------
+#=============================================================
 # executing the main functions
-#-------------------------------------------------------------
+#=============================================================
 
 fnLogStart
 fnPing $hostsFile $timeout
 fnEndScript
+#fnCleanup
